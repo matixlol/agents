@@ -1,0 +1,40 @@
+{
+  "name": "ahrefs-mcp",
+  "version": "0.1.0",
+  "description": "Minimal Codex plugin for Ahrefs' hosted MCP server.",
+  "author": {
+    "name": "Matias",
+    "email": "hola@mati.lol",
+    "url": "https://github.com/matixlol"
+  },
+  "homepage": "https://github.com/matixlol/agents",
+  "repository": "https://github.com/matixlol/agents",
+  "license": "MIT",
+  "keywords": [
+    "ahrefs",
+    "mcp",
+    "seo",
+    "codex"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Ahrefs MCP",
+    "shortDescription": "Use Ahrefs data from Codex through Ahrefs' hosted MCP server.",
+    "longDescription": "A minimal Codex plugin that only adds Ahrefs' hosted MCP server and a small Ahrefs skill.",
+    "developerName": "Matias",
+    "category": "Productivity",
+    "capabilities": [
+      "Search"
+    ],
+    "websiteURL": "https://docs.ahrefs.com/mcp/docs/introduction",
+    "privacyPolicyURL": "https://ahrefs.com/privacy-policy",
+    "termsOfServiceURL": "https://ahrefs.com/terms",
+    "defaultPrompt": [
+      "Use Ahrefs to compare two domains' backlink profiles.",
+      "Find top organic keywords for this site with Ahrefs.",
+      "Use Ahrefs data before answering SEO questions."
+    ],
+    "brandColor": "#FF8800"
+  }
+}
