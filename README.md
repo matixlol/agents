@@ -1,6 +1,41 @@
 # agents
 
-Minimal Codex plugin repo for hosted MCP integrations.
+Small repo for two things:
+
+- Codex plugins under `plugins/`
+- installable Pi resources under `extensions/`
+
+## Pi package
+
+This repo is also a minimal Pi package, so you can install it directly from git:
+
+```bash
+pi install git:github.com/matixlol/agents
+```
+
+Or try it without installing:
+
+```bash
+pi -e git:github.com/matixlol/agents
+```
+
+For the Codex fast extension specifically:
+
+```bash
+pi -e git:github.com/matixlol/agents --codex-fast --model openai-codex/gpt-5.4-mini
+# or, after installing the package:
+PI_CODEX_FAST=1 pi --model openai-codex/gpt-5.4-mini
+```
+
+Currently included Pi extension:
+
+- `codex-fast-mode`: experimental `openai-codex` request patch that injects `service_tier: "priority"` and shows `fast:priority` in Pi's footer
+
+Extension docs:
+
+- `docs/codex-fast-mode/README.md`
+
+## Codex plugins
 
 Currently included:
 
@@ -8,8 +43,11 @@ Currently included:
 
 ## Layout
 
+- `package.json`: Pi package manifest for git installs
+- `extensions/`: Pi extensions loaded by the package
+- `docs/`: extension docs
 - `.agents/plugins/marketplace.json`: repo-local marketplace entry for Codex
-- `plugins/ahrefs-mcp/`: the Ahrefs plugin itself
+- `plugins/ahrefs-mcp/`: the Ahrefs Codex plugin itself
 
 ## Included plugin
 
