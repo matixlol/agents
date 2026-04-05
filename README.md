@@ -23,13 +23,13 @@ For the Codex fast extension specifically:
 
 ```bash
 pi -e git:github.com/matixlol/agents --codex-fast --model openai-codex/gpt-5.4-mini
-# or, after installing the package:
-PI_CODEX_FAST=1 pi --model openai-codex/gpt-5.4-mini
+# or, after installing the package once:
+pi --model openai-codex/gpt-5.4-mini
 ```
 
 Currently included Pi extension:
 
-- `codex-fast-mode`: experimental `openai-codex` request patch that injects `service_tier: "priority"` and shows `fast:priority` in Pi's footer
+- `codex-fast-mode`: experimental `openai-codex` request patch that injects `service_tier: "priority"`, remembers the last enabled/tier state across Pi runs, and shows `fast:priority` in Pi's footer
 
 Extension docs:
 

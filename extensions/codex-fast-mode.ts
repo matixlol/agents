@@ -22,7 +22,11 @@
  *   /codex-fast status     Show current status
  */
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { AssistantMessage } from "@mariozechner/pi-ai";
+import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
@@ -35,10 +39,17 @@ type ProviderPayload = Record<string, unknown> & {
 	service_tier?: unknown;
 };
 
+type PersistedState = {
+	enabled?: boolean;
+	tier?: string;
+};
+
 interface SelectOption {
 	label: string;
 	value: string;
 }
+
+const STATE_FILE_PATH = join(getAgentDir(), "codex-fast-mode.json");
 
 function isProviderPayload(value: unknown): value is ProviderPayload {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -94,16 +105,50 @@ function formatTokens(count: number): string {
 	return `${Math.round(count / 1000000)}M`;
 }
 
-function isTruthyEnv(value: string | undefined): boolean {
-	if (!value) return false;
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+	if (!value) return undefined;
 	switch (value.trim().toLowerCase()) {
 		case "1":
 		case "true":
 		case "yes":
 		case "on":
 			return true;
-		default:
+		case "0":
+		case "false":
+		case "no":
+		case "off":
 			return false;
+		default:
+			return undefined;
+	}
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function loadPersistedState(): {
+	enabled?: boolean;
+	tier?: CodexServiceTier;
+	error?: string;
+} {
+	try {
+		const raw = readFileSync(STATE_FILE_PATH, "utf8");
+		const parsed = JSON.parse(raw) as PersistedState;
+		return {
+			enabled:
+				typeof parsed.enabled === "boolean" ? parsed.enabled : undefined,
+			tier:
+				typeof parsed.tier === "string"
+					? normalizeTier(parsed.tier)
+					: undefined,
+		};
+	} catch (error) {
+		const errorWithCode = error as NodeJS.ErrnoException;
+		if (errorWithCode.code === "ENOENT") {
+			return {};
+		}
+		return { error: getErrorMessage(error) };
 	}
 }
 
@@ -279,6 +324,22 @@ export default function codexFastModeExtension(pi: ExtensionAPI) {
 		});
 	};
 
+	const persistState = (ctx?: ExtensionContext) => {
+		try {
+			mkdirSync(getAgentDir(), { recursive: true });
+			writeFileSync(
+				STATE_FILE_PATH,
+				JSON.stringify({ enabled, tier }, null, "\t") + "\n",
+				"utf8",
+			);
+		} catch (error) {
+			ctx?.ui.notify(
+				`Failed to save Codex fast state: ${getErrorMessage(error)}`,
+				"warning",
+			);
+		}
+	};
+
 	const notifyState = (ctx: ExtensionContext) => {
 		ctx.ui.notify(describeState(enabled, tier, ctx), "info");
 	};
@@ -288,12 +349,14 @@ export default function codexFastModeExtension(pi: ExtensionAPI) {
 		if (nextTier) {
 			tier = nextTier;
 		}
+		persistState(ctx);
 		installFooter(ctx);
 		notifyState(ctx);
 	};
 
 	const disable = (ctx: ExtensionContext) => {
 		enabled = false;
+		persistState(ctx);
 		installFooter(ctx);
 		notifyState(ctx);
 	};
@@ -348,13 +411,11 @@ export default function codexFastModeExtension(pi: ExtensionAPI) {
 		description:
 			"Enable experimental Codex fast override (injects service_tier for openai-codex)",
 		type: "boolean",
-		default: false,
 	});
 
 	pi.registerFlag("codex-fast-tier", {
 		description: "Codex fast tier override: priority",
 		type: "string",
-		default: "priority",
 	});
 
 	pi.registerCommand("codex-fast", {
@@ -387,9 +448,24 @@ export default function codexFastModeExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
-		enabled =
-			pi.getFlag("codex-fast") === true ||
-			isTruthyEnv(process.env.PI_CODEX_FAST);
+		const persistedState = loadPersistedState();
+		if (persistedState.error) {
+			ctx.ui.notify(
+				`Failed to load Codex fast state: ${persistedState.error}`,
+				"warning",
+			);
+		}
+
+		const fastFlag = pi.getFlag("codex-fast");
+		const flagEnabled =
+			typeof fastFlag === "boolean" ? fastFlag : undefined;
+		const envEnabled = parseBooleanEnv(process.env.PI_CODEX_FAST);
+		if (process.env.PI_CODEX_FAST && envEnabled === undefined) {
+			ctx.ui.notify(
+				`Invalid PI_CODEX_FAST value: ${process.env.PI_CODEX_FAST}. Using persisted/default state.`,
+				"warning",
+			);
+		}
 
 		const tierFlag = pi.getFlag("codex-fast-tier");
 		const envTier = normalizeTier(process.env.PI_CODEX_FAST_TIER);
@@ -397,16 +473,18 @@ export default function codexFastModeExtension(pi: ExtensionAPI) {
 			typeof tierFlag === "string" ? normalizeTier(tierFlag) : undefined;
 		if (typeof tierFlag === "string" && !normalizedTier) {
 			ctx.ui.notify(
-				`Invalid --codex-fast-tier value: ${tierFlag}. Using priority.`,
+				`Invalid --codex-fast-tier value: ${tierFlag}. Using persisted/default tier.`,
 				"warning",
 			);
 		} else if (process.env.PI_CODEX_FAST_TIER && !envTier) {
 			ctx.ui.notify(
-				`Invalid PI_CODEX_FAST_TIER value: ${process.env.PI_CODEX_FAST_TIER}. Using priority.`,
+				`Invalid PI_CODEX_FAST_TIER value: ${process.env.PI_CODEX_FAST_TIER}. Using persisted/default tier.`,
 				"warning",
 			);
 		}
-		tier = normalizedTier ?? envTier ?? "priority";
+
+		enabled = flagEnabled ?? envEnabled ?? persistedState.enabled ?? false;
+		tier = normalizedTier ?? envTier ?? persistedState.tier ?? "priority";
 
 		installFooter(ctx);
 		if (enabled) {
