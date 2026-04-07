@@ -31,6 +31,11 @@ Currently included Pi extension:
 
 - `codex-fast-mode`: experimental `openai-codex` request patch that injects `service_tier: "priority"`, remembers the last enabled/tier state across Pi runs, and shows `fast:priority` in Pi's footer
 
+Currently included local plugins:
+
+- `plugins/ahrefs-mcp/`
+- `plugins/observablehq-mcp/`
+
 Extension docs:
 
 - `docs/codex-fast-mode/README.md`
@@ -40,6 +45,7 @@ Extension docs:
 Currently included:
 
 - `ahrefs-mcp`: a minimal Codex plugin that exposes Ahrefs' hosted MCP server and a small Ahrefs skill
+- `observablehq-mcp`: a local Codex plugin with a small MCP server for reading and editing Observable notebooks
 
 ## Layout
 

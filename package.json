@@ -10,10 +10,18 @@
       "./extensions"
     ]
   },
+  "scripts": {
+    "mcp:observablehq": "bun run ./plugins/observablehq-mcp/server/observable-notebook-mcp.ts"
+  },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-agent-core": "*",
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.20.0",
+    "zod": "^4.3.6"
   }
 }

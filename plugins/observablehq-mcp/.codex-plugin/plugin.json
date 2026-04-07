@@ -1,0 +1,30 @@
+{
+  "name": "observablehq-mcp",
+  "version": "0.1.0",
+  "description": "Local MCP server for reading and editing Observable notebooks through Observable's internal API.",
+  "author": {
+    "name": "Matias",
+    "email": "hola@mati.lol",
+    "url": "https://github.com/matixlol"
+  },
+  "homepage": "https://github.com/matixlol/agents",
+  "repository": "https://github.com/matixlol/agents",
+  "license": "MIT",
+  "keywords": ["observable", "observablehq", "mcp", "codex", "notebooks"],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "ObservableHQ MCP",
+    "shortDescription": "Read and edit Observable notebooks directly.",
+    "longDescription": "Local MCP server that reads notebook cells and applies direct edits through Observable's internal document and websocket APIs.",
+    "developerName": "Matias",
+    "category": "Developer Tools",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://observablehq.com",
+    "defaultPrompt": [
+      "List the cells in this Observable notebook.",
+      "Read the cell named mapaViz from this notebook.",
+      "Apply a targeted code change to an Observable cell."
+    ],
+    "brandColor": "#F59E0B"
+  }
+}

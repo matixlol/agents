@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "observablehq": {
+      "command": "bun",
+      "args": ["run", "./server/observable-notebook-mcp.ts"]
+    }
+  }
+}
