@@ -1,14 +1,23 @@
 {
   "name": "agents",
   "version": "0.1.0",
-  "description": "Small Pi package repo with installable extensions and Codex plugins.",
+  "description": "Small Pi package repo with installable Pi resources and Codex plugins.",
   "keywords": [
     "pi-package"
   ],
   "pi": {
     "extensions": [
-      "./extensions"
+      "./extensions/pi-cmux/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
     ]
+  },
+  "bin": {
+    "observablehq-mcp": "./plugins/observablehq-mcp/server/observable-notebook-mcp.ts"
   },
   "scripts": {
     "mcp:observablehq": "bun run ./plugins/observablehq-mcp/server/observable-notebook-mcp.ts"
