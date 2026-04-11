@@ -24,18 +24,32 @@ The easiest way to get this is to copy the full `Cookie` request header from an 
 
 ## MCP config example
 
+Machine-independent config using the git repo:
+
+```json
+{
+  "mcpServers": {
+    "observablehq": {
+      "command": "npx",
+      "args": ["-y", "github:matixlol/agents"],
+      "env": {
+        "OBSERVABLE_COOKIE": "D=...; T=...; I=..."
+      }
+    }
+  }
+}
+```
+
+`bunx --package=github:matixlol/agents observablehq-mcp` works too.
+
+Local checkout alternative:
+
 ```json
 {
   "mcpServers": {
     "observablehq": {
       "command": "bun",
-      "args": [
-        "run",
-        "/Users/user/dev/agents/plugins/observablehq-mcp/server/observable-notebook-mcp.ts"
-      ],
-      "env": {
-        "OBSERVABLE_COOKIE": "D=...; T=...; I=..."
-      }
+      "args": ["run", "./plugins/observablehq-mcp/server/observable-notebook-mcp.ts"]
     }
   }
 }
