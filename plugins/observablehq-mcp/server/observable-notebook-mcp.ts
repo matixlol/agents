@@ -80,6 +80,10 @@ type CellSelector = {
   index?: number;
 };
 
+type ListCellsOptions = {
+  includeCode?: boolean;
+};
+
 type SaveLoadMessage = {
   type: "load";
   version: number;
@@ -92,6 +96,11 @@ type SaveConfirmMessage = {
   type: "saveconfirm";
   version: number;
   subversion: number;
+};
+
+type WriteAccessInfo = {
+  writable: boolean;
+  source: "roles" | "websocket-probe" | "none";
 };
 
 function asTextResult(text: string, structuredContent?: unknown) {
@@ -225,7 +234,7 @@ function mergeCells(document: ObservableDocument): MergedCell[] {
   });
 }
 
-function summarizeCell(cell: MergedCell) {
+function summarizeCell(cell: MergedCell, options: ListCellsOptions = {}) {
   const preview =
     cell.value
       .split("\n")
@@ -242,6 +251,7 @@ function summarizeCell(cell: MergedCell) {
     pinned: cell.pinned,
     lines: cell.value.split("\n").length,
     preview,
+    ...(options.includeCode ? { value: cell.value } : {}),
   };
 }
 
@@ -275,6 +285,14 @@ function resolveCell(cells: MergedCell[], selector: CellSelector) {
   }
 
   return matches[0]!;
+}
+
+function resolveCells(cells: MergedCell[], selectors: CellSelector[]) {
+  if (selectors.length === 0) {
+    throw new Error("Provide at least one selector");
+  }
+
+  return selectors.map((selector) => resolveCell(cells, selector));
 }
 
 function replaceText({
@@ -410,6 +428,40 @@ async function openEditSocket(
   );
 }
 
+function getDocumentVersion(document: ObservableDocument) {
+  return (
+    document.latest_version ?? document.publish_version ?? document.version
+  );
+}
+
+async function detectWriteAccess(
+  document: ObservableDocument,
+  cookie?: string,
+): Promise<WriteAccessInfo> {
+  if (
+    (document.roles ?? []).some((role) => role === "editor" || role === "owner")
+  ) {
+    return { writable: true, source: "roles" };
+  }
+
+  if (!getCookieHeader(cookie)) {
+    return { writable: false, source: "none" };
+  }
+
+  const version = getDocumentVersion(document);
+  if (version === undefined) {
+    return { writable: false, source: "none" };
+  }
+
+  try {
+    const { socket } = await openEditSocket(document.id, version, cookie);
+    socket.close();
+    return { writable: true, source: "websocket-probe" };
+  } catch {
+    return { writable: false, source: "websocket-probe" };
+  }
+}
+
 async function saveCellValue(args: {
   notebook: string;
   value: string;
@@ -427,8 +479,7 @@ async function saveCellValue(args: {
     );
   }
 
-  const version =
-    document.latest_version ?? document.publish_version ?? document.version;
+  const version = getDocumentVersion(document);
   if (version === undefined) {
     throw new Error("Could not determine notebook version");
   }
@@ -440,17 +491,17 @@ async function saveCellValue(args: {
   );
 
   try {
-    const currentLength = target.value.length;
     const payload = {
       type: "save",
-      events: [],
-      edits: [
+      events: [
         {
+          version: load.version + 1,
+          type: "modify_node",
           node_id: target.nodeId,
-          length: currentLength,
-          changes: [{ from: 0, to: currentLength, insert: args.value }],
+          new_node_value: args.value,
         },
       ],
+      edits: [],
       version: load.version,
       subversion: load.subversion,
     };
@@ -516,8 +567,12 @@ async function saveCellValue(args: {
   }
 }
 
-function summarizeDocument(document: ObservableDocument) {
+async function summarizeDocument(
+  document: ObservableDocument,
+  cookie?: string,
+) {
   const cells = mergeCells(document);
+  const writeAccess = await detectWriteAccess(document, cookie);
 
   return {
     id: document.id,
@@ -527,15 +582,12 @@ function summarizeDocument(document: ObservableDocument) {
     publishLevel: document.publish_level,
     sharing: document.sharing,
     roles: document.roles ?? [],
-    latestVersion:
-      document.latest_version ??
-      document.publish_version ??
-      document.version ??
-      null,
+    latestVersion: getDocumentVersion(document) ?? null,
     updateTime: document.update_time ?? null,
     cellCount: cells.length,
     fileCount: document.files?.length ?? 0,
-    writable: (document.roles ?? []).includes("editor"),
+    writable: writeAccess.writable,
+    writableSource: writeAccess.source,
     files: (document.files ?? []).map((file) => ({
       id: file.id ?? null,
       name: file.name,
@@ -547,14 +599,18 @@ function summarizeDocument(document: ObservableDocument) {
 
 export async function getNotebookSummary(notebook: string, cookie?: string) {
   const document = await fetchDocument(notebook, cookie);
-  return summarizeDocument(document);
+  return await summarizeDocument(document, cookie);
 }
 
-export async function listNotebookCells(notebook: string, cookie?: string) {
+export async function listNotebookCells(
+  notebook: string,
+  options: ListCellsOptions = {},
+  cookie?: string,
+) {
   const document = await fetchDocument(notebook, cookie);
   return {
-    notebook: summarizeDocument(document),
-    cells: mergeCells(document).map(summarizeCell),
+    notebook: await summarizeDocument(document, cookie),
+    cells: mergeCells(document).map((cell) => summarizeCell(cell, options)),
   };
 }
 
@@ -573,10 +629,27 @@ export async function getNotebookCell(
       slug: document.slug,
       title: document.title,
     },
-    cell: {
-      ...summarizeCell(cell),
-      value: cell.value,
+    cell: summarizeCell(cell, { includeCode: true }),
+  };
+}
+
+export async function getNotebookCells(args: {
+  notebook: string;
+  selectors: CellSelector[];
+  cookie?: string;
+}) {
+  const document = await fetchDocument(args.notebook, args.cookie);
+  const cells = mergeCells(document);
+  const selected = resolveCells(cells, args.selectors);
+
+  return {
+    notebook: {
+      id: document.id,
+      slug: document.slug,
+      title: document.title,
     },
+    cellCount: selected.length,
+    cells: selected.map((cell) => summarizeCell(cell, { includeCode: true })),
   };
 }
 
@@ -607,7 +680,7 @@ export async function findNotebookCells(args: {
     query,
     caseSensitive,
     matchCount: cells.length,
-    cells: cells.map(summarizeCell),
+    cells: cells.map((cell) => summarizeCell(cell)),
   };
 }
 
@@ -677,17 +750,21 @@ function registerTools(server: McpServer) {
     "observable_list_cells",
     {
       description:
-        "List notebook cells with node ids, names, languages, and previews.",
+        "List notebook cells with node ids, names, languages, and previews. Optionally include full source code for each cell.",
       inputSchema: {
         notebook: z
           .string()
           .describe(
             "Observable notebook URL, slug like @user/notebook, or document id",
           ),
+        includeCode: z
+          .boolean()
+          .optional()
+          .describe("Include full source code for each returned cell"),
       },
     },
-    async ({ notebook }) => {
-      const result = await listNotebookCells(notebook);
+    async ({ notebook, includeCode }) => {
+      const result = await listNotebookCells(notebook, { includeCode });
       return asTextResult(jsonText(result), result);
     },
   );
@@ -750,6 +827,47 @@ function registerTools(server: McpServer) {
     },
     async ({ notebook, nodeId, name, index }) => {
       const result = await getNotebookCell(notebook, { nodeId, name, index });
+      return asTextResult(jsonText(result), result);
+    },
+  );
+
+  server.registerTool(
+    "observable_get_cells",
+    {
+      description:
+        "Read multiple notebook cells in one call. Each selector must include exactly one of nodeId, name, or index.",
+      inputSchema: {
+        notebook: z
+          .string()
+          .describe(
+            "Observable notebook URL, slug like @user/notebook, or document id",
+          ),
+        selectors: z
+          .array(
+            z.object({
+              nodeId: z
+                .number()
+                .int()
+                .optional()
+                .describe("Numeric Observable node id"),
+              name: z
+                .string()
+                .optional()
+                .describe("Exact Observable cell name/variable name"),
+              index: z
+                .number()
+                .int()
+                .min(0)
+                .optional()
+                .describe("Zero-based cell index in notebook order"),
+            }),
+          )
+          .min(1)
+          .describe("List of cell selectors to fetch in one call"),
+      },
+    },
+    async ({ notebook, selectors }) => {
+      const result = await getNotebookCells({ notebook, selectors });
       return asTextResult(jsonText(result), result);
     },
   );

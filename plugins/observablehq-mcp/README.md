@@ -44,9 +44,10 @@ The easiest way to get this is to copy the full `Cookie` request header from an 
 ## Tools
 
 - `observable_get_notebook`
-- `observable_list_cells`
+- `observable_list_cells` (`includeCode: true` to include full source)
 - `observable_find_cells`
 - `observable_get_cell`
+- `observable_get_cells`
 - `observable_set_cell`
 - `observable_replace_in_cell`
 
